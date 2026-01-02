@@ -134,6 +134,10 @@
         transform: translateZ(0);
     } 
 
+    /* Prevent Elements viewport from overlapping the global header */
+    .viewport-area[data-tool="Elements"] { padding-top: 96px; }
+    @media (max-width: 768px) { .viewport-area[data-tool="Elements"] { padding-top: 48px; } }
+
     .viewport-header { 
         position: absolute; top: 70px; left: 25px; z-index: 10; pointer-events: none; 
         max-width: 80%;
@@ -734,6 +738,52 @@
 }
 
 
+/* Periodic table styles */
+.elements-panel { display:flex; gap:18px; align-items:flex-start; }
+.ptable { --cell-w:44px; --cell-h:56px; display:grid; grid-template-columns: repeat(18, var(--cell-w)); grid-auto-rows: var(--cell-h); gap:6px; background: transparent; justify-content: start; }
+.ptable .cell { width:var(--cell-w); height:var(--cell-h); border-radius:6px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02); }
+.ptable .cell.empty { background: transparent; cursor:default; box-shadow: none; }
+.elem-btn { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; color:#000; font-weight:800; font-size:0.85rem; padding:4px 2px; }
+.elem-sym { font-size:1rem; font-weight:900; }
+.elem-z { font-size:0.6rem; opacity:0.9; margin-top:2px; }
+.element-detail { min-width:320px; max-width:420px; background: rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.04); padding:14px; border-radius:12px; }
+.element-detail h2 { margin:0 0 8px 0; font-size:1.4rem; color:var(--text-highlight); }
+.element-detail .sub { color:var(--text-main); margin-bottom:8px; }
+.element-props { display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:12px; }
+.element-props .prop { font-size:0.9rem; color:#cbd5e1; }
+.lanth-act-row { margin-top:12px; font-size:0.85rem; color:#cbd5e1; }
+
+/* Group color classes (adjusted to match reference palette) */
+.g-alkali { background: #000 !important; color:#fa4444 !important; }
+.g-alkaline { background: #000 !important; color:#fc7979 !important; }
+
+/* Override colors for the last two columns (IUPAC 17 and 18) */
+.g-col-17 { background: #000 !important; color: #34d399 !important; }
+.g-col-18 { background: #000 !important; color: #afbcd3 !important; }
+
+/* Specific element overrides */
+.g-yellow { background: #000 !important; color:#facc15 !important; }
+.g-orange { background: #000 !important; color:#fb8c00 !important; }
+.g-dblue { background: #000 !important; color:#1449a5 !important; }
+.g-black-purple { background: #000000 !important; color: #8b5fd6 !important; }
+
+/* Lanthanide / Actinide colors and series spacing */
+.g-lanth { background: #000 !important; color:#8bbfff !important; }
+.g-act  { background: #000 !important; color:#fac86a !important; }
+.series-wrap { margin-top: 24px; }
+.series-ptable { margin-top: 10px; }
+
+/* Ensure Elements card can expand but stay within viewport; allow scroll if content exceeds space */
+.viewport-area[data-tool="Elements"] .card { max-height: none; }
+@media (max-width: 768px) { .viewport-area[data-tool="Elements"] .card { max-height: none; } }
+.g-nonmetal { background: #000 !important; color:#d2efff !important; }
+
+/* Hover / focus enlargement */
+.elem-btn { transition: transform 0.16s ease, box-shadow 0.16s ease; transform-origin: center; }
+.cell:not(.empty):hover, .cell:not(.empty):focus-within { z-index: 30; }
+.cell:not(.empty):hover .elem-btn, .cell:not(.empty):focus-within .elem-btn { transform: scale(1.15); box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
+.cell:not(.empty) { will-change: transform; }
+
 </style>
 </head>
 <body>
@@ -803,6 +853,37 @@
                     // update title label if needed
                     const label = root.querySelector('.app-switch-label');
                     if(label && toolName) label.textContent = toolName === 'ChemScope' ? 'ChemScope' : toolName;
+                    // If switching to Elements, ensure periodic table renders (in case it was skipped)
+                    if (toolName === 'Elements') {
+                        try {
+                            // Ensure the periodic table markup exists in the viewport (create if missing)
+                            if (viewTarget && !viewTarget.querySelector('#periodicTable')) {
+                                console.log('Elements viewport missing periodicTable — injecting markup');
+                                const inject = document.createElement('div');
+                                inject.innerHTML = `
+                                    <div style="padding:28px; display:flex; gap:20px; align-items:flex-start;">
+                                        <div class="card" style="flex:1 1 0; padding:14px; min-width:420px;">
+                                            <div class="card-title">Periodic Table</div>
+                                            <div style="margin-top:10px;">
+                                                <div class="select-instruction" style="margin-bottom:12px;">
+                                                    <div style="font-weight:700; color:var(--text-highlight); font-size:1.05rem;">Select an element</div>
+                                                    <div style="color:var(--text-main); font-size:0.95rem;">Click any element on the table to view details in the panel to the right.</div>
+                                                </div>
+                                                <div id="periodicTable" class="ptable" style="overflow:visible; max-width:100%; width:100%;"></div>
+                                            </div>
+                                        </div>
+                                        <div class="card element-detail" id="elementDetail">
+                                            <h2>Select an element</h2>
+                                            <div class="sub">Click any element on the table to view details here.</div>
+                                            <div id="detailContent"></div>
+                                        </div>
+                                    </div>
+                                `;
+                                viewTarget.appendChild(inject);
+                            }
+                            setTimeout(function(){ console.log('calling renderPeriodicTable'); try { renderPeriodicTable(); } catch(e) { console.warn('renderPeriodicTable failed', e); } }, 30);
+                        } catch (e) { console.warn('renderPeriodicTable failed', e); }
+                    }
                 }
 
                 menu.addEventListener('click', (e)=>{
@@ -833,9 +914,17 @@
     <div class="viewport-area viewport-panel" data-tool="Elements" style="display:none">
         <div class="viewport-header">
             <h1 class="title">Elements</h1>
-            <div class="molecule-display-info" id="elements-display-info">
-                <div class="info-formula">--</div>
-                <div class="info-name">Elements Browser</div>
+        </div>
+        <div style="padding:28px; display:flex; gap:20px; align-items:flex-start;">
+            <div class="card" style="flex:1 1 0; padding:14px; min-width:420px;">
+                <div class="card-title">Periodic Table</div>
+                <div style="margin-top:10px;">
+                    <div class="select-instruction" style="margin-bottom:12px;">
+                        <div style="font-weight:700; color:var(--text-highlight); font-size:1.05rem;">Select an element</div>
+                        <div style="color:var(--text-main); font-size:0.95rem;">Click any element on the table to view details in the panel to the right.</div>
+                    </div>
+                    <div id="periodicTable" class="ptable" style="overflow:visible; max-width:100%; width:100%;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -918,7 +1007,13 @@
             </div>
 
             <div class="tool-panel" data-tool="Elements" style="display:none">
-                <div class="card"><div class="card-title">Elements</div><div class="card">Elements control panel placeholder (periodic table controls).</div></div>
+                <div class="card">
+                    <div class="card-title">Element Data</div>
+                    <div class="card" id="elementDataPanel">
+                        <div style="font-weight:700; color:var(--text-highlight); font-size:1.0rem;">No element selected</div>
+                        <div style="color:var(--text-main); margin-top:8px;" id="elementDataContent">Click an element on the periodic table to view its data here.</div>
+                    </div>
+                </div>
             </div>
 
             <div class="tool-panel" data-tool="EquationBalancer" style="display:none">
@@ -5120,8 +5215,309 @@ function formatConfigHtml(str) {
               .replace(/([spdf])(\d+)/g, '$1<sup>$2</sup>');
 }
 
+// Render a simple periodic table grid using ELECTRON_DATA
+function renderPeriodicTable() {
+    const container = document.getElementById('periodicTable');
+    if (!container) return;
+    container.innerHTML = '';
+    // If data not loaded yet, show a friendly message and retry a few times
+    const DATA = (typeof ELECTRON_DATA !== 'undefined') ? ELECTRON_DATA : (window.ELECTRON_DATA || null);
+    if (!DATA || !Array.isArray(DATA) || DATA.length === 0) {
+        container.innerHTML = `<div style="padding:12px;color:#facc15;font-weight:700;">Loading element data…</div>`;
+        if (!renderPeriodicTable._retries) renderPeriodicTable._retries = 0;
+        if (renderPeriodicTable._retries < 8) {
+            renderPeriodicTable._retries++;
+            setTimeout(renderPeriodicTable, 120);
+        } else {
+            container.innerHTML = `<div style="padding:12px;color:#f87171;font-weight:700;">Element data unavailable.</div>`;
+        }
+        return;
+    }
+    renderPeriodicTable._retries = 0;
+
+    // ensure cell size fits container (responsive)
+    function adjustPeriodicTableSizeOnce() {
+        try {
+            const cols = 18;
+            const gap = parseFloat(getComputedStyle(container).getPropertyValue('gap')) || 6;
+            const avail = container.clientWidth || container.getBoundingClientRect().width || (window.innerWidth * 0.6);
+            const totalGap = (cols - 1) * gap;
+            let cellW = Math.floor((avail - totalGap) / cols);
+            // clamp cell width
+            const minW = 28; const maxW = 72;
+            if (cellW < minW) cellW = minW;
+            if (cellW > maxW) cellW = maxW;
+            const cellH = Math.round(cellW * 1.25);
+            container.style.setProperty('--cell-w', cellW + 'px');
+            container.style.setProperty('--cell-h', cellH + 'px');
+        } catch (err) { console.warn('adjustPeriodicTableSizeOnce error', err); }
+    }
+    // call initially and on resize
+    adjustPeriodicTableSizeOnce();
+    if (!renderPeriodicTable._resizerAdded) {
+        window.addEventListener('resize', adjustPeriodicTableSizeOnce);
+        renderPeriodicTable._resizerAdded = true;
+    }
+
+    // create empty 7 x 18 grid cells as placeholders
+    const totalCols = 18;
+    const totalRows = 7;
+    const grid = Array.from({length: totalRows}, () => new Array(totalCols).fill(null));
+
+    // place main-block elements based on iupac group (numeric)
+    DATA.forEach(el => {
+        const iupac = parseInt(el.iupac);
+        if (!isNaN(iupac)) {
+            const row = Math.max(1, el.p) - 1; // 0-based row
+            const col = iupac - 1; // 0-based col
+            if (row < totalRows && col < totalCols) grid[row][col] = el;
+        }
+    });
+
+    // fill grid cells into DOM
+    for (let r = 0; r < totalRows; r++) {
+        for (let c = 0; c < totalCols; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            const el = grid[r][c];
+            if (!el) {
+                cell.classList.add('empty');
+                container.appendChild(cell);
+                continue;
+            }
+            const btn = document.createElement('button');
+            btn.className = 'elem-btn';
+            // determine group class and prefer group color scheme
+            let groupClass = 'g-metal';
+            if (el.s === 'H') groupClass = 'g-nonmetal';
+            else if (el.type === 'metalloid') groupClass = 'g-metalloid';
+            else if (el.type === 'nonmetal') groupClass = 'g-nonmetal';
+            const iupacNum = parseInt(el.iupac);
+            if (!isNaN(iupacNum)) {
+                if (iupacNum === 1 && el.s !== 'H') groupClass = 'g-alkali';
+                else if (iupacNum === 2) groupClass = 'g-alkaline';
+                else if (iupacNum === 17) groupClass = 'g-halogen';
+                else if (iupacNum === 18) groupClass = 'g-noble';
+                // tag column-specific classes so we can override colors
+                if (iupacNum === 17) btn.classList.add('g-col-17');
+                if (iupacNum === 18) btn.classList.add('g-col-18');
+                // Symbol-specific and group-range overrides requested by user
+                try {
+                    // groups 3-12 -> black bg, purple text
+                    if (!isNaN(iupacNum) && iupacNum >= 3 && iupacNum <= 12) {
+                        btn.classList.add('g-black-purple');
+                    }
+                    const yellowSet = new Set(['C','N','O','P','S','Se']);
+                    const orangeSet = new Set(['B','Si','Ge','As','Sb','Te','Po']);
+                    if (yellowSet.has(el.s)) {
+                        btn.classList.add('g-yellow');
+                    } else if (orangeSet.has(el.s)) {
+                        btn.classList.add('g-orange');
+                    } else if (!isNaN(iupacNum) && iupacNum >= 13 && iupacNum <= 16) {
+                        // remaining elements in groups 13-16 -> dark blue
+                        btn.classList.add('g-dblue');
+                    }
+                } catch (ex) { /* ignore */ }
+            }
+            btn.classList.add(groupClass);
+            btn.title = `${el.s} (${el.n}) Z=${el.z}`;
+            btn.innerHTML = `<div class="elem-sym">${el.s}</div><div class="elem-z">${el.z}</div>`;
+            btn.onclick = () => showElementDetails(el.s);
+            cell.appendChild(btn);
+            container.appendChild(cell);
+        }
+    }
+
+    // render lanthanides and actinides as full-width 18-column grids aligned with the main table
+    const renderSeriesGrid = (elements, startColIndex) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'series-wrap';
+        wrap.style.display = 'block';
+        // prefer CSS but ensure sufficient spacing if inline styles are present
+        wrap.style.marginTop = '24px';
+
+        const seriesGrid = document.createElement('div');
+        seriesGrid.className = 'ptable series-ptable';
+        // create 18 cells, placing elements starting at startColIndex
+        for (let i = 0; i < 18; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            const elIdx = i - startColIndex;
+            if (elIdx >= 0 && elIdx < elements.length) {
+                const el = elements[elIdx];
+                const btn = document.createElement('button'); btn.className = 'elem-btn';
+                // apply same group classes as main grid, but mark f-block specially
+                let groupClass = 'g-metal';
+                if (el.z >= 57 && el.z <= 71) groupClass = 'g-lanth';
+                else if (el.z >= 89 && el.z <= 103) groupClass = 'g-act';
+                else if (el.s === 'H') groupClass = 'g-nonmetal';
+                else if (el.type === 'metalloid') groupClass = 'g-metalloid';
+                else if (el.type === 'nonmetal') groupClass = 'g-nonmetal';
+                const iupacNum = parseInt(el.iupac);
+                if (!isNaN(iupacNum)) {
+                    if (iupacNum === 1 && el.s !== 'H') groupClass = 'g-alkali';
+                    else if (iupacNum === 2) groupClass = 'g-alkaline';
+                    else if (iupacNum === 17) groupClass = 'g-halogen';
+                    else if (iupacNum === 18) groupClass = 'g-noble';
+                }
+                btn.classList.add(groupClass);
+                btn.title = `${el.s} (${el.n}) Z=${el.z}`;
+                btn.innerHTML = `<div class="elem-sym">${el.s}</div><div class="elem-z">${el.z}</div>`;
+                btn.onclick = () => showElementDetails(el.s);
+                cell.appendChild(btn);
+            } else {
+                cell.classList.add('empty');
+            }
+            seriesGrid.appendChild(cell);
+        }
+        wrap.appendChild(seriesGrid);
+        return wrap;
+    };
+
+    const lanth = DATA.filter(e => e.z >= 57 && e.z <= 71).sort((a,b)=>a.z-b.z);
+    const act = DATA.filter(e => e.z >= 89 && e.z <= 103).sort((a,b)=>a.z-b.z);
+
+    // remove any previously rendered series rows to avoid duplication
+    try { const parentRem = container.parentElement; parentRem && parentRem.querySelectorAll('.series-wrap').forEach(n => n.remove()); } catch(e) {}
+    // insert lanthanides first (so it appears above actinides), then insert actinides after it
+    const parentIns = container.parentElement || container;
+    if (lanth.length) {
+        const lanWrap = renderSeriesGrid(lanth, 2);
+        parentIns.insertBefore(lanWrap, container.nextSibling);
+        if (act.length) {
+            const actWrap = renderSeriesGrid(act, 2);
+            parentIns.insertBefore(actWrap, lanWrap.nextSibling);
+        }
+    } else if (act.length) {
+        parentIns.insertBefore(renderSeriesGrid(act, 2), container.nextSibling);
+    }
+
+    // Recompute sizing to account for extra rows (main 7 rows + 2 series rows)
+    function recomputeForHeight() {
+        try {
+            const mainRows = 7;
+            const extraRows = (lanth.length ? 1 : 0) + (act.length ? 1 : 0);
+            const totalRowsAll = mainRows + extraRows;
+            // horizontal constraint (same as before)
+            const cols = 18;
+            const gap = parseFloat(getComputedStyle(container).getPropertyValue('gap')) || 6;
+            const availW = container.clientWidth || container.getBoundingClientRect().width || (window.innerWidth * 0.6);
+            const totalGapW = (cols - 1) * gap;
+            const cellW_fromWidth = Math.floor((availW - totalGapW) / cols);
+
+            // vertical constraint: compute available height from viewport so rows fit without scrolling
+            const top = container.getBoundingClientRect().top || 0;
+            // reserved space for headers, card paddings and labels
+            const reserved = 120;
+            const availH = Math.max(120, window.innerHeight - top - reserved);
+            const totalGapH = (totalRowsAll - 1) * gap;
+            const cellH_fromHeight = Math.floor((availH - totalGapH) / totalRowsAll);
+            const cellW_fromHeight = Math.floor(cellH_fromHeight / 1.25);
+
+            let cellW = cellW_fromWidth;
+            if (!isNaN(cellW_fromHeight) && cellW_fromHeight > 0) cellW = Math.min(cellW_fromWidth, cellW_fromHeight);
+            const minW = 20; const maxW = 72;
+            if (cellW < minW) cellW = minW;
+            if (cellW > maxW) cellW = maxW;
+            const cellH = Math.round(cellW * 1.25);
+            container.style.setProperty('--cell-w', cellW + 'px');
+            container.style.setProperty('--cell-h', cellH + 'px');
+            // also set on any series grids we created so they match
+            container.parentElement.querySelectorAll('.series-ptable').forEach(g => { g.style.setProperty('--cell-w', cellW + 'px'); g.style.setProperty('--cell-h', cellH + 'px'); });
+        } catch (err) { console.warn('recomputeForHeight error', err); }
+    }
+    // call once and ensure it runs on resize as well
+    recomputeForHeight();
+    if (!renderPeriodicTable._heightResizerAdded) {
+        window.addEventListener('resize', recomputeForHeight);
+        renderPeriodicTable._heightResizerAdded = true;
+    }
+}
+
+function showElementDetails(symbol) {
+    const sourceData = (typeof ELECTRON_DATA !== 'undefined') ? ELECTRON_DATA : (window.ELECTRON_DATA || []);
+    const el = (sourceData || []).find(e => e.s === symbol);
+    const props = (typeof ELEMENT_PROPS !== 'undefined' ? ELEMENT_PROPS : (window.ELEMENT_PROPS || {}))[symbol] || {};
+    // normalize type/state to English for display
+    const _cap = s => (s && String(s).length) ? (String(s).charAt(0).toUpperCase() + String(s).slice(1)) : s;
+    function normalizeState(s) {
+        if (!s && !props.state) return '-';
+        const raw = String(s || props.state || '').trim();
+        const low = raw.toLowerCase();
+        if (/固体|固體|固態|固态/.test(raw)) return 'Solid';
+        if (/气体|氣體|气态|氣態|氣態/.test(raw)) return 'Gas';
+        if (/液体|液體|液態/.test(raw)) return 'Liquid';
+        if (/solid/i.test(low)) return 'Solid';
+        if (/gas/i.test(low)) return 'Gas';
+        if (/liquid/i.test(low)) return 'Liquid';
+        return _cap(raw);
+    }
+    function normalizeType(t) {
+        if (!t && !el.type) return '-';
+        const raw = String(t || el.type || '').trim();
+        const low = raw.toLowerCase();
+        // detect 'metalloid' first to avoid matching 'metal' inside 'metalloid'
+        if (/metalloid|類金屬|類金属|类金属|類金屬/.test(low)) return 'Metalloid';
+        if (/非金屬|非金属|非金|nonmetal|non-metal|non/.test(low)) return 'Nonmetal';
+        if (/金屬|金属|metal/.test(low)) return 'Metal';
+        return _cap(raw);
+    }
+    const displayState = normalizeState(el.state || props.state);
+    const displayType = normalizeType(el.type || props.type);
+    const panel = document.getElementById('detailContent');
+    if (!el) return;
+    if (panel) panel.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+            <div>
+                <div style="font-size:1.6rem; font-weight:900;">${el.s} <span style="font-weight:600; color:#facc15;">Z=${el.z}</span></div>
+                <div style="color:#cbd5e1; margin-top:4px;">${el.n}</div>
+            </div>
+            <div style="width:64px; height:64px; border-radius:8px; background:${props.c3d||'#ddd'}; display:flex; align-items:center; justify-content:center; font-weight:900;">${el.s}</div>
+        </div>
+        <div style="margin-top:10px; color:#e6e6e6;">Electron config: <strong style="color:#facc15">${el.c}</strong> (${el.noble || ''})</div>
+        <div class="element-props">
+            <div class="prop">Mass: <strong style="color:#fff">${props.mass || el.mass || '-'}</strong></div>
+            <div class="prop">Electronegativity: <strong style="color:#fff">${props.en || '-'}</strong></div>
+            <div class="prop">State: <strong style="color:#fff">${displayState}</strong></div>
+            <div class="prop">Type: <strong style="color:#fff">${displayType}</strong></div>
+            <div class="prop">Period: <strong style="color:#fff">${el.p || '-'}</strong></div>
+            <div class="prop">Group: <strong style="color:#fff">${el.iupac || el.g || '-'}</strong></div>
+        </div>
+        <div style="margin-top:10px; color:#cbd5e1; font-size:0.95rem;">Melting point: ${el.mp || '-'} &nbsp; • &nbsp; Boiling point: ${el.bp || '-'}</div>
+        <div style="margin-top:10px;">${(el.desc || '')}</div>
+    `;
+    // also populate the left-side Element Data panel if present
+    try {
+        // hide the initial placeholder line inside elementDataPanel if present
+        const panelWrap = document.getElementById('elementDataPanel');
+        if (panelWrap) {
+            const firstDiv = panelWrap.querySelector('div');
+            if (firstDiv && /no element selected/i.test(firstDiv.textContent || '')) firstDiv.style.display = 'none';
+        }
+        const leftPanel = document.getElementById('elementDataContent');
+        if (leftPanel) {
+            leftPanel.innerHTML = `
+                <div style="font-weight:700; color:var(--text-highlight); font-size:1.05rem;">${el.s} — ${el.n}</div>
+                <div style="margin-top:8px; color:var(--text-main);">Atomic number: <strong style="color:#fff">${el.z}</strong></div>
+                <div style="margin-top:6px; color:#cbd5e1; font-size:0.95rem;">Type: <strong style="color:#fff">${displayType}</strong></div>
+                <div style="margin-top:6px; color:#cbd5e1; font-size:0.95rem;">Standard state: <strong style="color:#fff">${displayState}</strong></div>
+                <div style="margin-top:6px; color:#cbd5e1; font-size:0.95rem;">Melting point: <strong style="color:#fff">${el.mp || '-'}</strong> &nbsp;•&nbsp; Boiling point: <strong style="color:#fff">${el.bp || '-'}</strong></div>
+                <div style="margin-top:8px; color:#e6e6e6;">Electron configuration: <strong style="color:#facc15">${el.c || '-'}</strong></div>
+                <div style="margin-top:8px; color:#e6e6e6;">${(el.desc || '')}</div>
+            `;
+        }
+    } catch (ex) { /* ignore */ }
+    const infoBox = document.querySelector('#elements-display-info .info-formula'); if(infoBox) infoBox.textContent = el.s;
+}
+
 function openConfigModal() { const modal = document.getElementById('config-modal'); if(modal) { modal.style.display = 'flex'; renderConfigList(); } }
 function closeConfigModal() { const modal = document.getElementById('config-modal'); if(modal) modal.style.display = 'none'; }
+// render periodic table on initial load
+if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', () => { try { renderPeriodicTable(); } catch(e) { /* ignore */ } });
+} else {
+    try { renderPeriodicTable(); } catch(e) { /* ignore */ }
+}
 
 
 function checkAtomClick(screenX, screenY) {
